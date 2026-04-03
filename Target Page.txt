@@ -1,0 +1,1080 @@
+<?php
+use Joomla\CMS\Uri\Uri;
+
+// Canonical tag (ensures correct indexing)
+$canonicalUrl = Uri::getInstance()->toString();
+echo '<link rel="canonical" href="' . htmlspecialchars($canonicalUrl) . '" />' . "\n";
+
+// Hreflang setup for generic English + fallback
+$pathWithQuery = Uri::getInstance()->toString(['path', 'query']);
+$href = 'https://lottoexpert.net' . $pathWithQuery;
+
+echo '<link rel="alternate" hreflang="en" href="' . $href . '" />' . "\n";
+echo '<link rel="alternate" hreflang="x-default" href="' . $href . '" />' . "\n";
+
+
+$user = JFactory::getUser();
+$loginStatus = $user->guest;
+
+if($loginStatus == 1){   
+$get_session = JFactory::getSession();
+$user_Session = $get_session->getId();
+}else{
+    //Get user phone
+    $user =& JFactory::getUser();
+    $userId = $user->get( 'id' );
+    $db = JFactory::getDBO();
+    $sql = "SELECT `profile_value` FROM `#__user_profiles` WHERE `profile_key` = 'profile.phone' AND `user_id` = '$userId'";
+    $db->setQuery($sql);
+    $db->execute();
+    $userPhone = $db->loadResult();
+    
+    if(!empty($userPhone)){
+        $userPhone = str_replace("\"","",$userPhone);
+        $userPhone = str_replace("(","",$userPhone);
+        $userPhone = str_replace(")","-",$userPhone);
+    }else{
+        $userPhone = 'NULL';
+    }
+}
+?>
+<style>
+h1.stateGameName{text-align:center;font-size:32px;margin-bottom:35px;}
+img.lotteryLogo {max-height: 100px;margin: 0px auto;}
+.latestDraw{display:none;}
+.latestDrawStats {overflow: hidden;width: 100%;max-width: 500px;margin: 0px auto 50px;border-bottom: 5px solid #000;border-right: 1px solid #ddd;border-left: 1px solid #ddd;border-radius: 10px;}
+.result-wrapper {width: 98.2%;padding: 5px;box-sizing: content-box;background:#fff;transition: all 0.3s ease;}
+.result-wrapper:hover{background:#fff;transition:all 0.3s ease;}
+.fsd-date {width: 100%;text-align: center;margin-bottom: 10px;}
+.fsd-dresults {display: block;width: 100%;text-align: center;color: #191094;font-weight: 500;font-size: 18px;background: #fded24;margin-bottom: 15px;border: 1px solid #191094;line-height: 1.2;padding-top: 15px;padding-bottom: 15px;}
+.fsd-dresults strong {font-size: 22px;font-weight: 800;letter-spacing: 2px;}
+span.pball {color: #dc2b13;}
+span.pplay {color: #1a1199;font-weight: 700;}
+h2.latestHeading{background:#261d8b;color: #fff;padding: 10px;font-size: 24px;text-align: center;margin-bottom: 0px;}
+.fsd-nJackpot {text-align: center;font-size: 21px;font-weight: 700;}
+.fsd-nJackpot span {font-size: 32px;color: #191094;}
+p.lstResult {text-align: center;}
+p.acsoon {background: black;color: #fff;padding: 5px;text-align: center;margin-bottom: 0px;}
+.drawHistory {padding: 15px;border: 1px solid #160e83;margin-top: 35px;background: #f6f6f6;border-radius: 10px;border-top: 7px solid #160e83;}
+.fsd-pb {width: 40px;display: inline-block;}
+.fsd-circle{position:relative;display: inline-block;margin: 0px 2px;background:radial-gradient(circle at 50% 20%,#2ea9ff,#0066ad 75%,#333 100%);color: #fff;border-radius: 50%;padding: 5px 7px 5px 7px;width: 32px;height: 32px;text-align: center;}
+.fsd-pb-circle{position:relative;display: inline-block;background: radial-gradient(circle at 50% 20%,#f97f92,#a3071e 75%,#333 100%);color: #fff;border-radius: 50%;padding: 5px 7px 5px 7px;width: 32px;height: 32px;text-align: center;}
+.fsd-circle:after,.fsd-pb-circle:after {content: " ";display: block;position: absolute;width: 32px;height: 5px;bottom: -10%;left: 50%;transform: translate(-50%);border-radius: 50%;background: radial-gradient(ellipse at center,rgba(51,51,51,.75) 0,rgba(51,51,51,0) 75%);}
+.latestDrawStats.top10 h3 {background: #261d8b;font-size: 21px;padding: 10px;text-align: center;color: #fff;}
+.top10 .drawnStats {padding: 20px !important;}
+.top10 .drawnStats .fsd-circle, .top10 .fsd-pb-circle {margin-bottom: 5px;}
+.original-draw,.original-pdraw {border-top-right-radius: 10px;border-top-left-radius: 10px;}
+.lottery-fields-date {text-align: center;}
+select#nod,select#pnod {width: 55px;padding: 5px 2px;display: inline;}
+input[type="date"] {max-width: 130px;padding: 5px 2px !important;display: inline !important;}
+input[type="submit"] {margin: 5px;padding: 2px 30px;color: #fff;background: #000;border: 1px solid #000;border-radius: 5px;width: 90%;}
+.freqDrawStats {max-width: 1000px; margin: 0px auto;}
+.flash-red { animation: flashRed 1s infinite; } @keyframes flashRed { 0%, 100% { color: inherit; } 50% { color: red; } }
+
+
+
+
+.pbHistoryBtn {
+    display: block;
+    background-color: #005bea; /* Deep royal blue */
+    color: #ffffff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 16px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease-in-out;
+    margin: 10px auto;
+    width: 250px;
+    text-align: center;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.pbHistoryBtn:hover {
+    background-color: #0042a3; /* Darker blue on hover */
+    box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3); /* Glow effect */
+    transform: scale(1.02); /* Slight enlargement */
+}
+
+.flash-red {
+    color: #ff5733; /* Red-orange for better contrast */
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+
+
+
+
+@media only screen 
+and (min-width : 320px) 
+and (max-width : 800px) {
+  .result-wrapper,.fsd-date{width:100%}
+  h2.lotteryHeading {color: #fff;font-size: 18px;}
+  img.lottoMan {max-width: 32px;}
+  .drawHistory {padding: 5px;max-width: 97%;font-size: 14px;}
+}
+/** COLUMN SYSTEM **/
+.section{clear:both;padding:0px;margin:0px}
+.col{display:block;float:left;margin:1% 0 1% 1.6%}
+.group:before,.group:after{content: " ";display:table}
+.group:after{clear:both}
+.col:first-child{margin-left:0}
+.span_2_of_2{width:100%}
+.span_1_of_2{width:48.2%}
+.span_3_of_3{width:100%}
+.span_2_of_3{width:66.1%}
+.span_1_of_3{width:32.2%}
+.span_4_of_4{width:100%}
+.span_3_of_4{width:74.6%}
+.span_2_of_4{width:48.2%}
+.span_1_of_4{width:23.8%}
+@media only screen and (max-width:480px){.span_2_of_2{width:100%}
+.span_1_of_2{width:100%}}
+@media only screen and (max-width:480px){.span_3_of_3{width:100%}
+.span_2_of_3{width:100%}
+.span_1_of_3{width:100%}}
+@media only screen and (max-width:480px){.span_4_of_4{width:100%}
+.span_3_of_4{width:100%}
+.span_2_of_4{width:100%}
+.span_1_of_4{width:100%}}
+</style>
+
+<div class="section group">
+<div class="col span_2_of_2">
+<div class="latestDrawStats">
+<h2 class="latestHeading"><?=$stateName;?> <?=$gName;?> Results</h2>
+<?php  /** GAME FILTER **/   
+    $db = JFactory::getDBO();
+    if($gId === 'WI7'){
+    $sql = "SELECT * FROM `$dbCol` WHERE `game_id` = 'WI7' ORDER BY `draw_date` DESC LIMIT 1";
+    }else if($gId === 'WI8'){
+    $sql = "SELECT * FROM `$dbCol` WHERE `game_id` = 'WI8' ORDER BY `draw_date` DESC LIMIT 1";
+    }
+    $db->setQuery($sql);
+    $db->execute();
+    $latestResult = $db->loadObjectList();
+    
+    if(!Empty($latestResult)){
+        
+        foreach($latestResult as $lr){
+            $gId = $lr->game_id;
+            $draw_date = $lr->draw_date;
+            $draw_results = $lr->draw_results;
+            $next_draw_date = $lr->next_draw_date;
+            $next_jackpot = $lr->next_jackpot;
+            /** NUMBER POSITIONS **/
+            $p1 = $lr->first;
+            $p2 = $lr->second;
+            $p3 = $lr->third;
+            $p4 = $lr->fourth;
+            $p5 = $lr->fifth;
+            $p6 = $lr->sixth;
+            $p7 = $lr->seventh;
+            $p8 = $lr->eighth;
+            $p9 = $lr->nineth;
+            $p10 = $lr->tenth;
+            $p11 = $lr->eleventh;
+            $p12 = $lr->twelveth;
+            $p13 = $lr->thirtheenth;
+            $p14 = $lr->fourteenth;
+            $p15 = $lr->fifteenth;
+            $p16 = $lr->sixteenth;
+            $p17 = $lr->seventeenth;
+            $p18 = $lr->eighteenth;
+            $p19 = $lr->nineteenth;
+            $p20 = $lr->twentieth;
+
+            
+            echo '<div class="result-wrapper">';
+            echo '<img src="/images/lottodb/us/'.strtolower($stateAbrev).'/'.str_replace(" ","-",strtolower($gName)).'.png" class="lotteryLogo" alt="'.$stateName.' '.$gName.'">';
+            echo '<div class="fsd-date">Drawing date:<br /><strong>'.date('m-d-Y',strtotime($draw_date)).'</strong></div>';
+            
+            /** CASHBALL RESULTS **/
+            echo '<p class="lstResult"><br /><br /><span class="circles">'.$p1.'</span><span class="circles">'.$p2.'</span><span class="circles">'.$p3.'</span><span class="circles">'.$p4.'</span><span class="circles">'.$p5.'</span><span class="circles">'.$p6.'</span><span class="circles">'.$p7.'</span><span class="circles">'.$p8.'</span><span class="circles">'.$p9.'</span><span class="circles">'.$p10.'</span><span class="circles">'.$p11.'</span></p>';
+            
+            echo '<div class="fsd-date">Next drawing date:<br /><strong>'.date('m-d-Y',strtotime($next_draw_date)).'</strong></div>';
+            
+            if($next_jackpot != '' && $next_jackpot > '0' && $next_jackpot != 'n/a'){
+                echo '<div class="fsd-nJackpot">Next Jackpot<br /><span>$'.number_format((float)$next_jackpot, 0, '.', ',').'</span></div>';
+            }
+
+            /** Oscar Added link to bottom of results window **/
+ 
+if ($gId === 'WI7') {
+
+    // SKAI first, then AI
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/skai-lottery-prediction?gameId=WI7"> SKAI Analysis</a></strong></center>';
+
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/ai-powered-predictions?game_id=WI7"> AI Powered Analysis</a></strong></center>';
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/wisconsin-all-or-nothing-evening-skip-and-hit-analysis"> Skip and Hit Analysis</a></strong></center>';
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/markov-chain-monte-carlo-mcmc-analysis?game_id=WI7">  MCMC Analysis</a></strong></center>';
+
+} elseif ($gId === 'WI8') {
+
+    // SKAI first, then AI
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/skai-lottery-prediction?gameId=WI8"> SKAI Analysis</a></strong></center>';
+
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/ai-powered-predictions?game_id=WI8"> AI Powered Analysis</a></strong></center>';
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/wisconsin-all-or-nothing-midday-skip-and-hit-analysis"> Skip and Hit Analysis</a></strong></center>';
+    echo '<center><strong><a class="pbHistoryBtn" href="/picking-winning-numbers/artificial-intelligence/markov-chain-monte-carlo-mcmc-analysis?game_id=WI8">  MCMC Analysis</a></strong></center>';
+
+}
+      
+             
+        /** DRAW HISTORY **/
+        echo '<div class="drawHistory"><h2>Draw History</h2>';
+        
+        $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p1' OR second = '$p1' OR third = '$p1' OR fourth = '$p1' OR fifth = '$p1' OR sixth = '$p1' OR seventh = '$p1' OR eighth = '$p1' OR nineth = '$p1' OR tenth = '$p1' OR eleventh = '$p1' OR twelveth = '$p1' OR thirtheenth = '$p1' OR fourteenth = '$p1' OR fifteenth = '$p1' OR sixteenth = '$p1' OR seventeenth = '$p1' OR eighteenth = '$p1' OR nineteenth = '$p1' OR twentieth = '$p1' OR twenty_first = '$p1' OR twenty_second = '$p1') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p1' OR second = '$p1' OR third = '$p1' OR fourth = '$p1' OR fifth = '$p1' OR sixth = '$p1' OR seventh = '$p1' OR eighth = '$p1' OR nineth = '$p1' OR tenth = '$p1' OR eleventh = '$p1' OR twelveth = '$p1' OR thirtheenth = '$p1' OR fourteenth = '$p1' OR fifteenth = '$p1' OR sixteenth = '$p1' OR seventeenth = '$p1' OR eighteenth = '$p1' OR nineteenth = '$p1' OR twentieth = '$p1' OR twenty_first = '$p1' OR twenty_second = '$p1') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDraw1B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw1B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw1B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $row1count = $db->loadResult();
+            
+            $row1count = $row1count +1;
+            echo '<strong>'.$p1.':</strong> drawn '.date('m-d-Y',strtotime($lastDraw1B)).' <strong>('.$row1count.' drawings ago)</strong><br />';
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p2' OR second = '$p2' OR third = '$p2' OR fourth = '$p2' OR fifth = '$p2' OR sixth = '$p2' OR seventh = '$p2' OR eighth = '$p2' OR nineth = '$p2' OR tenth = '$p2' OR eleventh = '$p2' OR twelveth = '$p2' OR thirtheenth = '$p2' OR fourteenth = '$p2' OR fifteenth = '$p2' OR sixteenth = '$p2' OR seventeenth = '$p2' OR eighteenth = '$p2' OR nineteenth = '$p2' OR twentieth = '$p2' OR twenty_first = '$p2' OR twenty_second = '$p2') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p2' OR second = '$p2' OR third = '$p2' OR fourth = '$p2' OR fifth = '$p2' OR sixth = '$p2' OR seventh = '$p2' OR eighth = '$p2' OR nineth = '$p2' OR tenth = '$p2' OR eleventh = '$p2' OR twelveth = '$p2' OR thirtheenth = '$p2' OR fourteenth = '$p2' OR fifteenth = '$p2' OR sixteenth = '$p2' OR seventeenth = '$p2' OR eighteenth = '$p2' OR nineteenth = '$p2' OR twentieth = '$p2' OR twenty_first = '$p2' OR twenty_second = '$p2') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDraw2B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw2B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw2B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $row2count = $db->loadResult();
+            
+            $row2count = $row2count +1;
+            echo '<strong>'.$p2.':</strong> drawn '.date('m-d-Y',strtotime($lastDraw2B)).' <strong>('.$row2count.' drawings ago)</strong><br />';    
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p3' OR second = '$p3' OR third = '$p3' OR fourth = '$p3' OR fifth = '$p3' OR sixth = '$p3' OR seventh = '$p3' OR eighth = '$p3' OR nineth = '$p3' OR tenth = '$p3' OR eleventh = '$p3' OR twelveth = '$p3' OR thirtheenth = '$p3' OR fourteenth = '$p3' OR fifteenth = '$p3' OR sixteenth = '$p3' OR seventeenth = '$p3' OR eighteenth = '$p3' OR nineteenth = '$p3' OR twentieth = '$p3' OR twenty_first = '$p3' OR twenty_second = '$p3') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p3' OR second = '$p3' OR third = '$p3' OR fourth = '$p3' OR fifth = '$p3' OR sixth = '$p3' OR seventh = '$p3' OR eighth = '$p3' OR nineth = '$p3' OR tenth = '$p3' OR eleventh = '$p3' OR twelveth = '$p3' OR thirtheenth = '$p3' OR fourteenth = '$p3' OR fifteenth = '$p3' OR sixteenth = '$p3' OR seventeenth = '$p3' OR eighteenth = '$p3' OR nineteenth = '$p3' OR twentieth = '$p3' OR twenty_first = '$p3' OR twenty_second = '$p3') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDraw3B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw3B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw3B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $row3count = $db->loadResult();
+            
+            $row3count = $row3count +1;
+            echo '<strong>'.$p3.':</strong> drawn '.date('m-d-Y',strtotime($lastDraw3B)).' <strong>('.$row3count.' drawings ago)</strong><br />';    
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p4' OR second = '$p4' OR third = '$p4' OR fourth = '$p4' OR fifth = '$p4' OR sixth = '$p4' OR seventh = '$p4' OR eighth = '$p4' OR nineth = '$p4' OR tenth = '$p4' OR eleventh = '$p4' OR twelveth = '$p4' OR thirtheenth = '$p4' OR fourteenth = '$p4' OR fifteenth = '$p4' OR sixteenth = '$p4' OR seventeenth = '$p4' OR eighteenth = '$p4' OR nineteenth = '$p4' OR twentieth = '$p4' OR twenty_first = '$p4' OR twenty_second = '$p4') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p4' OR second = '$p4' OR third = '$p4' OR fourth = '$p4' OR fifth = '$p4' OR sixth = '$p4' OR seventh = '$p4' OR eighth = '$p4' OR nineth = '$p4' OR tenth = '$p4' OR eleventh = '$p4' OR twelveth = '$p4' OR thirtheenth = '$p4' OR fourteenth = '$p4' OR fifteenth = '$p4' OR sixteenth = '$p4' OR seventeenth = '$p4' OR eighteenth = '$p4' OR nineteenth = '$p4' OR twentieth = '$p4' OR twenty_first = '$p4' OR twenty_second = '$p4') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDraw4B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw4B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw4B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $row4count = $db->loadResult();
+            
+            $row4count = $row4count +1;
+            echo '<strong>'.$p4.':</strong> drawn '.date('m-d-Y',strtotime($lastDraw4B)).' <strong>('.$row4count.' drawings ago)</strong><br />';    
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p5' OR second = '$p5' OR third = '$p5' OR fourth = '$p5' OR fifth = '$p5' OR sixth = '$p5' OR seventh = '$p5' OR eighth = '$p5' OR nineth = '$p5' OR tenth = '$p5' OR eleventh = '$p5' OR twelveth = '$p5' OR thirtheenth = '$p5' OR fourteenth = '$p5' OR fifteenth = '$p5' OR sixteenth = '$p5' OR seventeenth = '$p5' OR eighteenth = '$p5' OR nineteenth = '$p5' OR twentieth = '$p5' OR twenty_first = '$p5' OR twenty_second = '$p5') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p5' OR second = '$p5' OR third = '$p5' OR fourth = '$p5' OR fifth = '$p5' OR sixth = '$p5' OR seventh = '$p5' OR eighth = '$p5' OR nineth = '$p5' OR tenth = '$p5' OR eleventh = '$p5' OR twelveth = '$p5' OR thirtheenth = '$p5' OR fourteenth = '$p5' OR fifteenth = '$p5' OR sixteenth = '$p5' OR seventeenth = '$p5' OR eighteenth = '$p5' OR nineteenth = '$p5' OR twentieth = '$p5' OR twenty_first = '$p5' OR twenty_second = '$p5') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDraw5B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw5B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDraw5B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $row5count = $db->loadResult();
+            
+            
+            $row5count = $row5count +1;
+            echo '<strong>'.$p5.':</strong> drawn '.date('m-d-Y',strtotime($lastDraw5B)).' <strong>('.$row5count.' drawings ago)</strong><br />';    
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p6' OR second = '$p6' OR third = '$p6' OR fourth = '$p6' OR fifth = '$p6' OR sixth = '$p6' OR seventh = '$p6' OR eighth = '$p6' OR nineth = '$p6' OR tenth = '$p6' OR eleventh = '$p6' OR twelveth = '$p6' OR thirtheenth = '$p6' OR fourteenth = '$p6' OR fifteenth = '$p6' OR sixteenth = '$p6' OR seventeenth = '$p6' OR eighteenth = '$p6' OR nineteenth = '$p6' OR twentieth = '$p6' OR twenty_first = '$p6' OR twenty_second = '$p6') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p6' OR second = '$p6' OR third = '$p6' OR fourth = '$p6' OR fifth = '$p6' OR sixth = '$p6' OR seventh = '$p6' OR eighth = '$p6' OR nineth = '$p6' OR tenth = '$p6' OR eleventh = '$p6' OR twelveth = '$p6' OR thirtheenth = '$p6' OR fourteenth = '$p6' OR fifteenth = '$p6' OR sixteenth = '$p6' OR seventeenth = '$p6' OR eighteenth = '$p6' OR nineteenth = '$p6' OR twentieth = '$p6' OR twenty_first = '$p6' OR twenty_second = '$p6') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP6B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP6B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP6B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP6count = $db->loadResult();
+            
+            $rowP6count = $rowP6count +1;
+            echo '<strong>'.$p6.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP6B)).' <strong>('.$rowP6count.' drawings ago)</strong><br />';  
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p7' OR second = '$p7' OR third = '$p7' OR fourth = '$p7' OR fifth = '$p7' OR sixth = '$p7' OR seventh = '$p7' OR eighth = '$p7' OR nineth = '$p7' OR tenth = '$p7' OR eleventh = '$p7' OR twelveth = '$p7' OR thirtheenth = '$p7' OR fourteenth = '$p7' OR fifteenth = '$p7' OR sixteenth = '$p7' OR seventeenth = '$p7' OR eighteenth = '$p7' OR nineteenth = '$p7' OR twentieth = '$p7' OR twenty_first = '$p7' OR twenty_second = '$p7') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p7' OR second = '$p7' OR third = '$p7' OR fourth = '$p7' OR fifth = '$p7' OR sixth = '$p7' OR seventh = '$p7' OR eighth = '$p7' OR nineth = '$p7' OR tenth = '$p7' OR eleventh = '$p7' OR twelveth = '$p7' OR thirtheenth = '$p7' OR fourteenth = '$p7' OR fifteenth = '$p7' OR sixteenth = '$p7' OR seventeenth = '$p7' OR eighteenth = '$p7' OR nineteenth = '$p7' OR twentieth = '$p7' OR twenty_first = '$p7' OR twenty_second = '$p7') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP7B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP7B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP7B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP7count = $db->loadResult();
+            
+            $rowP7count = $rowP7count +1;
+            echo '<strong>'.$p7.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP7B)).' <strong>('.$rowP7count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p8' OR second = '$p8' OR third = '$p8' OR fourth = '$p8' OR fifth = '$p8' OR sixth = '$p8' OR seventh = '$p8' OR eighth = '$p8' OR nineth = '$p8' OR tenth = '$p8' OR eleventh = '$p8' OR twelveth = '$p8' OR thirtheenth = '$p8' OR fourteenth = '$p8' OR fifteenth = '$p8' OR sixteenth = '$p8' OR seventeenth = '$p8' OR eighteenth = '$p8' OR nineteenth = '$p8' OR twentieth = '$p8' OR twenty_first = '$p8' OR twenty_second = '$p8') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p8' OR second = '$p8' OR third = '$p8' OR fourth = '$p8' OR fifth = '$p8' OR sixth = '$p8' OR seventh = '$p8' OR eighth = '$p8' OR nineth = '$p8' OR tenth = '$p8' OR eleventh = '$p8' OR twelveth = '$p8' OR thirtheenth = '$p8' OR fourteenth = '$p8' OR fifteenth = '$p8' OR sixteenth = '$p8' OR seventeenth = '$p8' OR eighteenth = '$p8' OR nineteenth = '$p8' OR twentieth = '$p8' OR twenty_first = '$p8' OR twenty_second = '$p8') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP8B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP8B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP8B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP8count = $db->loadResult();
+            
+            $rowP8count = $rowP8count +1;
+            echo '<strong>'.$p8.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP8B)).' <strong>('.$rowP8count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p9' OR second = '$p9' OR third = '$p9' OR fourth = '$p9' OR fifth = '$p9' OR sixth = '$p9' OR seventh = '$p9' OR eighth = '$p9' OR nineth = '$p9' OR tenth = '$p9' OR eleventh = '$p9' OR twelveth = '$p9' OR thirtheenth = '$p9' OR fourteenth = '$p9' OR fifteenth = '$p9' OR sixteenth = '$p9' OR seventeenth = '$p9' OR eighteenth = '$p9' OR nineteenth = '$p9' OR twentieth = '$p9' OR twenty_first = '$p9' OR twenty_second = '$p9') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p9' OR second = '$p9' OR third = '$p9' OR fourth = '$p9' OR fifth = '$p9' OR sixth = '$p9' OR seventh = '$p9' OR eighth = '$p9' OR nineth = '$p9' OR tenth = '$p9' OR eleventh = '$p9' OR twelveth = '$p9' OR thirtheenth = '$p9' OR fourteenth = '$p9' OR fifteenth = '$p9' OR sixteenth = '$p9' OR seventeenth = '$p9' OR eighteenth = '$p9' OR nineteenth = '$p9' OR twentieth = '$p9' OR twenty_first = '$p9' OR twenty_second = '$p9') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP9B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP9B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP9B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP9count = $db->loadResult();
+            
+            $rowP9count = $rowP9count +1;
+            echo '<strong>'.$p9.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP9B)).' <strong>('.$rowP9count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p10' OR second = '$p10' OR third = '$p10' OR fourth = '$p10' OR fifth = '$p10' OR sixth = '$p10' OR seventh = '$p10' OR eighth = '$p10' OR nineth = '$p10' OR tenth = '$p10' OR eleventh = '$p10' OR twelveth = '$p10' OR thirtheenth = '$p10' OR fourteenth = '$p10' OR fifteenth = '$p10' OR sixteenth = '$p10' OR seventeenth = '$p10' OR eighteenth = '$p10' OR nineteenth = '$p10' OR twentieth = '$p10' OR twenty_first = '$p10' OR twenty_second = '$p10') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p10' OR second = '$p10' OR third = '$p10' OR fourth = '$p10' OR fifth = '$p10' OR sixth = '$p10' OR seventh = '$p10' OR eighth = '$p10' OR nineth = '$p10' OR tenth = '$p10' OR eleventh = '$p10' OR twelveth = '$p10' OR thirtheenth = '$p10' OR fourteenth = '$p10' OR fifteenth = '$p10' OR sixteenth = '$p10' OR seventeenth = '$p10' OR eighteenth = '$p10' OR nineteenth = '$p10' OR twentieth = '$p10' OR twenty_first = '$p10' OR twenty_second = '$p10') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP10B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP10B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP10B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP10count = $db->loadResult();
+            
+            $rowP10count = $rowP10count +1;
+            echo '<strong>'.$p10.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP10B)).' <strong>('.$rowP10count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p11' OR second = '$p11' OR third = '$p11' OR fourth = '$p11' OR fifth = '$p11' OR sixth = '$p11' OR seventh = '$p11' OR eighth = '$p11' OR nineth = '$p11' OR tenth = '$p11' OR eleventh = '$p11' OR twelveth = '$p11' OR thirtheenth = '$p11' OR fourteenth = '$p11' OR fifteenth = '$p11' OR sixteenth = '$p11' OR seventeenth = '$p11' OR eighteenth = '$p11' OR nineteenth = '$p11' OR twentieth = '$p11' OR twenty_first = '$p11' OR twenty_second = '$p11') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p11' OR second = '$p11' OR third = '$p11' OR fourth = '$p11' OR fifth = '$p11' OR sixth = '$p11' OR seventh = '$p11' OR eighth = '$p11' OR nineth = '$p11' OR tenth = '$p11' OR eleventh = '$p11' OR twelveth = '$p11' OR thirtheenth = '$p11' OR fourteenth = '$p11' OR fifteenth = '$p11' OR sixteenth = '$p11' OR seventeenth = '$p11' OR eighteenth = '$p11' OR nineteenth = '$p11' OR twentieth = '$p11' OR twenty_first = '$p11' OR twenty_second = '$p11') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP11B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+            if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP11B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP11B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP11count = $db->loadResult();
+            
+            $rowP11count = $rowP11count +1;
+            echo '<strong>'.$p11.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP11B)).' <strong>('.$rowP11count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+ //           if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p12' OR second = '$p12' OR third = '$p12' OR fourth = '$p12' OR fifth = '$p12' OR sixth = '$p12' OR seventh = '$p12' OR eighth = '$p12' OR nineth = '$p12' OR tenth = '$p12' OR eleventh = '$p12' OR twelveth = '$p12' OR thirtheenth = '$p12' OR fourteenth = '$p12' OR fifteenth = '$p12' OR sixteenth = '$p12' OR seventeenth = '$p12' OR eighteenth = '$p12' OR nineteenth = '$p12' OR twentieth = '$p12' OR twenty_first = '$p12' OR twenty_second = '$p12') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p12' OR second = '$p12' OR third = '$p12' OR fourth = '$p12' OR fifth = '$p12' OR sixth = '$p12' OR seventh = '$p12' OR eighth = '$p12' OR nineth = '$p12' OR tenth = '$p12' OR eleventh = '$p12' OR twelveth = '$p12' OR thirtheenth = '$p12' OR fourteenth = '$p12' OR fifteenth = '$p12' OR sixteenth = '$p12' OR seventeenth = '$p12' OR eighteenth = '$p12' OR nineteenth = '$p12' OR twentieth = '$p12' OR twenty_first = '$p12' OR twenty_second = '$p12') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP12B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP12B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP12B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP12count = $db->loadResult();
+//            
+//            $rowP12count = $rowP12count +1;
+//            echo '<strong>'.$p12.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP12B)).' <strong>('.$rowP12count.' drawings ago)</strong><br />';   
+//            
+ //           $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p13' OR second = '$p13' OR third = '$p13' OR fourth = '$p13' OR fifth = '$p13' OR sixth = '$p13' OR seventh = '$p13' OR eighth = '$p13' OR nineth = '$p13' OR tenth = '$p13' OR eleventh = '$p13' OR twelveth = '$p13' OR thirtheenth = '$p13' OR fourteenth = '$p13' OR fifteenth = '$p13' OR sixteenth = '$p13' OR seventeenth = '$p13' OR eighteenth = '$p13' OR nineteenth = '$p13' OR twentieth = '$p13' OR twenty_first = '$p13' OR twenty_second = '$p13') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p13' OR second = '$p13' OR third = '$p13' OR fourth = '$p13' OR fifth = '$p13' OR sixth = '$p13' OR seventh = '$p13' OR eighth = '$p13' OR nineth = '$p13' OR tenth = '$p13' OR eleventh = '$p13' OR twelveth = '$p13' OR thirtheenth = '$p13' OR fourteenth = '$p13' OR fifteenth = '$p13' OR sixteenth = '$p13' OR seventeenth = '$p13' OR eighteenth = '$p13' OR nineteenth = '$p13' OR twentieth = '$p13' OR twenty_first = '$p13' OR twenty_second = '$p13') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP13B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP13B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP13B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP13count = $db->loadResult();
+//            
+//            $rowP13count = $rowP13count +1;
+//            echo '<strong>'.$p13.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP13B)).' <strong>('.$rowP13count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p14' OR second = '$p14' OR third = '$p14' OR fourth = '$p14' OR fifth = '$p14' OR sixth = '$p14' OR seventh = '$p14' OR eighth = '$p14' OR nineth = '$p14' OR tenth = '$p14' OR eleventh = '$p14' OR twelveth = '$p14' OR thirtheenth = '$p14' OR fourteenth = '$p14' OR fifteenth = '$p14' OR sixteenth = '$p14' OR seventeenth = '$p14' OR eighteenth = '$p14' OR nineteenth = '$p14' OR twentieth = '$p14' OR twenty_first = '$p14' OR twenty_second = '$p14') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p14' OR second = '$p14' OR third = '$p14' OR fourth = '$p14' OR fifth = '$p14' OR sixth = '$p14' OR seventh = '$p14' OR eighth = '$p14' OR nineth = '$p14' OR tenth = '$p14' OR eleventh = '$p14' OR twelveth = '$p14' OR thirtheenth = '$p14' OR fourteenth = '$p14' OR fifteenth = '$p14' OR sixteenth = '$p14' OR seventeenth = '$p14' OR eighteenth = '$p14' OR nineteenth = '$p14' OR twentieth = '$p14' OR twenty_first = '$p14' OR twenty_second = '$p14') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP14B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP14B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP14B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP14count = $db->loadResult();
+//            
+//            $rowP14count = $rowP14count +1;
+//            echo '<strong>'.$p14.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP14B)).' <strong>('.$rowP14count.' drawings ago)</strong><br />';  
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p15' OR second = '$p15' OR third = '$p15' OR fourth = '$p15' OR fifth = '$p15' OR sixth = '$p15' OR seventh = '$p15' OR eighth = '$p15' OR nineth = '$p15' OR tenth = '$p15' OR eleventh = '$p15' OR twelveth = '$p15' OR thirtheenth = '$p15' OR fourteenth = '$p15' OR fifteenth = '$p15' OR sixteenth = '$p15' OR seventeenth = '$p15' OR eighteenth = '$p15' OR nineteenth = '$p15' OR twentieth = '$p15' OR twenty_first = '$p15' OR twenty_second = '$p15') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p15' OR second = '$p15' OR third = '$p15' OR fourth = '$p15' OR fifth = '$p15' OR sixth = '$p15' OR seventh = '$p15' OR eighth = '$p15' OR nineth = '$p15' OR tenth = '$p15' OR eleventh = '$p15' OR twelveth = '$p15' OR thirtheenth = '$p15' OR fourteenth = '$p15' OR fifteenth = '$p15' OR sixteenth = '$p15' OR seventeenth = '$p15' OR eighteenth = '$p15' OR nineteenth = '$p15' OR twentieth = '$p15' OR twenty_first = '$p15' OR twenty_second = '$p15') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP15B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP15B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP15B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP15count = $db->loadResult();
+//            
+//            $rowP15count = $rowP15count +1;
+//            echo '<strong>'.$p15.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP15B)).' <strong>('.$rowP15count.' drawings ago)</strong><br />'; 
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p16' OR second = '$p16' OR third = '$p16' OR fourth = '$p16' OR fifth = '$p16' OR sixth = '$p16' OR seventh = '$p16' OR eighth = '$p16' OR nineth = '$p16' OR tenth = '$p16' OR eleventh = '$p16' OR twelveth = '$p16' OR thirtheenth = '$p16' OR fourteenth = '$p16' OR fifteenth = '$p16' OR sixteenth = '$p16' OR seventeenth = '$p16' OR eighteenth = '$p16' OR nineteenth = '$p16' OR twentieth = '$p16' OR twenty_first = '$p16' OR twenty_second = '$p16') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p16' OR second = '$p16' OR third = '$p16' OR fourth = '$p16' OR fifth = '$p16' OR sixth = '$p16' OR seventh = '$p16' OR eighth = '$p16' OR nineth = '$p16' OR tenth = '$p16' OR eleventh = '$p16' OR twelveth = '$p16' OR thirtheenth = '$p16' OR fourteenth = '$p16' OR fifteenth = '$p16' OR sixteenth = '$p16' OR seventeenth = '$p16' OR eighteenth = '$p16' OR nineteenth = '$p16' OR twentieth = '$p16' OR twenty_first = '$p16' OR twenty_second = '$p16') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP16B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP16B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP16B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP16count = $db->loadResult();
+//            
+//            $rowP16count = $rowP16count +1;
+//            echo '<strong>'.$p16.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP16B)).' <strong>('.$rowP16count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p17' OR second = '$p17' OR third = '$p17' OR fourth = '$p17' OR fifth = '$p17' OR sixth = '$p17' OR seventh = '$p17' OR eighth = '$p17' OR nineth = '$p17' OR tenth = '$p17' OR eleventh = '$p17' OR twelveth = '$p17' OR thirtheenth = '$p17' OR fourteenth = '$p17' OR fifteenth = '$p17' OR sixteenth = '$p17' OR seventeenth = '$p17' OR eighteenth = '$p17' OR nineteenth = '$p17' OR twentieth = '$p17' OR twenty_first = '$p17' OR twenty_second = '$p17') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p17' OR second = '$p17' OR third = '$p17' OR fourth = '$p17' OR fifth = '$p17' OR sixth = '$p17' OR seventh = '$p17' OR eighth = '$p17' OR nineth = '$p17' OR tenth = '$p17' OR eleventh = '$p17' OR twelveth = '$p17' OR thirtheenth = '$p17' OR fourteenth = '$p17' OR fifteenth = '$p17' OR sixteenth = '$p17' OR seventeenth = '$p17' OR eighteenth = '$p17' OR nineteenth = '$p17' OR twentieth = '$p17' OR twenty_first = '$p17' OR twenty_second = '$p17') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP17B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP17B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP17B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP17count = $db->loadResult();
+//            
+//            $rowP17count = $rowP17count +1;
+//            echo '<strong>'.$p17.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP17B)).' <strong>('.$rowP17count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p18' OR second = '$p18' OR third = '$p18' OR fourth = '$p18' OR fifth = '$p18' OR sixth = '$p18' OR seventh = '$p18' OR eighth = '$p18' OR nineth = '$p18' OR tenth = '$p18' OR eleventh = '$p18' OR twelveth = '$p18' OR thirtheenth = '$p18' OR fourteenth = '$p18' OR fifteenth = '$p18' OR sixteenth = '$p18' OR seventeenth = '$p18' OR eighteenth = '$p18' OR nineteenth = '$p18' OR twentieth = '$p18' OR twenty_first = '$p18' OR twenty_second = '$p18') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p18' OR second = '$p18' OR third = '$p18' OR fourth = '$p18' OR fifth = '$p18' OR sixth = '$p18' OR seventh = '$p18' OR eighth = '$p18' OR nineth = '$p18' OR tenth = '$p18' OR eleventh = '$p18' OR twelveth = '$p18' OR thirtheenth = '$p18' OR fourteenth = '$p18' OR fifteenth = '$p18' OR sixteenth = '$p18' OR seventeenth = '$p18' OR eighteenth = '$p18' OR nineteenth = '$p18' OR twentieth = '$p18' OR twenty_first = '$p18' OR twenty_second = '$p18') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP18B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP18B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP18B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP18count = $db->loadResult();
+//            
+//            $rowP18count = $rowP18count +1;
+//            echo '<strong>'.$p18.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP18B)).' <strong>('.$rowP18count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p19' OR second = '$p19' OR third = '$p19' OR fourth = '$p19' OR fifth = '$p19' OR sixth = '$p19' OR seventh = '$p19' OR eighth = '$p19' OR nineth = '$p19' OR tenth = '$p19' OR eleventh = '$p19' OR twelveth = '$p19' OR thirtheenth = '$p19' OR fourteenth = '$p19' OR fifteenth = '$p19' OR sixteenth = '$p19' OR seventeenth = '$p19' OR eighteenth = '$p19' OR nineteenth = '$p19' OR twentieth = '$p19' OR twenty_first = '$p19' OR twenty_second = '$p19') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p19' OR second = '$p19' OR third = '$p19' OR fourth = '$p19' OR fifth = '$p19' OR sixth = '$p19' OR seventh = '$p19' OR eighth = '$p19' OR nineth = '$p19' OR tenth = '$p19' OR eleventh = '$p19' OR twelveth = '$p19' OR thirtheenth = '$p19' OR fourteenth = '$p19' OR fifteenth = '$p19' OR sixteenth = '$p19' OR seventeenth = '$p19' OR eighteenth = '$p19' OR nineteenth = '$p19' OR twentieth = '$p19' OR twenty_first = '$p19' OR twenty_second = '$p19') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP19B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP19B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP19B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP19count = $db->loadResult();
+//            
+//            $rowP19count = $rowP19count +1;
+//            echo '<strong>'.$p19.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP19B)).' <strong>('.$rowP19count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p20' OR second = '$p20' OR third = '$p20' OR fourth = '$p20' OR fifth = '$p20' OR sixth = '$p20' OR seventh = '$p20' OR eighth = '$p20' OR nineth = '$p20' OR tenth = '$p20' OR eleventh = '$p20' OR twelveth = '$p20' OR thirtheenth = '$p20' OR fourteenth = '$p20' OR fifteenth = '$p20' OR sixteenth = '$p20' OR seventeenth = '$p20' OR eighteenth = '$p20' OR nineteenth = '$p20' OR twentieth = '$p20' OR twenty_first = '$p20' OR twenty_second = '$p20') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p20' OR second = '$p20' OR third = '$p20' OR fourth = '$p20' OR fifth = '$p20' OR sixth = '$p20' OR seventh = '$p20' OR eighth = '$p20' OR nineth = '$p20' OR tenth = '$p20' OR eleventh = '$p20' OR twelveth = '$p20' OR thirtheenth = '$p20' OR fourteenth = '$p20' OR fifteenth = '$p20' OR sixteenth = '$p20' OR seventeenth = '$p20' OR eighteenth = '$p20' OR nineteenth = '$p20' OR twentieth = '$p20' OR twenty_first = '$p20' OR twenty_second = '$p20') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $lastDrawP20B = $db->loadResult();
+//            
+//            $db = JFactory::getDBO();
+//            /** GAME FILTER **/
+//            if($gId === 'WI7'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP20B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+//            }else if($gId === 'WI8'){
+//            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP20B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+//            }
+//            $db->setQuery($sql);
+//            $db->execute();
+//            $rowP20count = $db->loadResult();
+//            
+//            $rowP20count = $rowP20count +1;
+//            echo '<strong>'.$p20.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP20B)).' <strong>('.$rowP20count.' drawings ago)</strong><br />';   
+//            
+//            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+       /**     if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p21' OR second = '$p21' OR third = '$p21' OR fourth = '$p21' OR fifth = '$p21' OR sixth = '$p21' OR seventh = '$p21' OR eighth = '$p21' OR nineth = '$p21' OR tenth = '$p21' OR eleventh = '$p21' OR twelveth = '$p21' OR thirtheenth = '$p21' OR fourteenth = '$p21' OR fifteenth = '$p21' OR sixteenth = '$p21' OR seventeenth = '$p21' OR eighteenth = '$p21' OR nineteenth = '$p21' OR twentieth = '$p21' OR twenty_first = '$p21' OR twenty_second = '$p21') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p21' OR second = '$p21' OR third = '$p21' OR fourth = '$p21' OR fifth = '$p21' OR sixth = '$p21' OR seventh = '$p21' OR eighth = '$p21' OR nineth = '$p21' OR tenth = '$p21' OR eleventh = '$p21' OR twelveth = '$p21' OR thirtheenth = '$p21' OR fourteenth = '$p21' OR fifteenth = '$p21' OR sixteenth = '$p21' OR seventeenth = '$p21' OR eighteenth = '$p21' OR nineteenth = '$p21' OR twentieth = '$p21' OR twenty_first = '$p21' OR twenty_second = '$p21') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP21B = $db->loadResult();
+            
+            $db = JFactory::getDBO(); **/
+            /** GAME FILTER **/
+       /**     if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP21B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP21B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP21count = $db->loadResult();
+            
+            $rowP21count = $rowP21count +1;
+            echo '<strong>'.$p21.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP21B)).' <strong>('.$rowP21count.' drawings ago)</strong><br />';   
+            
+            $db = JFactory::getDBO(); **/
+            /** GAME FILTER **/
+        /**     if($gId === 'WI7'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p22' OR second = '$p22' OR third = '$p22' OR fourth = '$p22' OR fifth = '$p22' OR sixth = '$p22' OR seventh = '$p22' OR eighth = '$p22' OR nineth = '$p22' OR tenth = '$p22' OR eleventh = '$p22' OR twelveth = '$p22' OR thirtheenth = '$p22' OR fourteenth = '$p22' OR fifteenth = '$p22' OR sixteenth = '$p22' OR seventeenth = '$p22' OR eighteenth = '$p22' OR nineteenth = '$p22' OR twentieth = '$p22' OR twenty_first = '$p22' OR twenty_second = '$p22') AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT MAX(draw_date) FROM `$dbCol` WHERE (first = '$p22' OR second = '$p22' OR third = '$p22' OR fourth = '$p22' OR fifth = '$p22' OR sixth = '$p22' OR seventh = '$p22' OR eighth = '$p22' OR nineth = '$p22' OR tenth = '$p22' OR eleventh = '$p22' OR twelveth = '$p22' OR thirtheenth = '$p22' OR fourteenth = '$p22' OR fifteenth = '$p22' OR sixteenth = '$p22' OR seventeenth = '$p22' OR eighteenth = '$p22' OR nineteenth = '$p22' OR twentieth = '$p22' OR twenty_first = '$p22' OR twenty_second = '$p22') AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $lastDrawP22B = $db->loadResult();
+            
+            $db = JFactory::getDBO();
+            /** GAME FILTER **/
+     /**        if($gId === 'WI7'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP22B' AND draw_date < '$draw_date' AND game_id = 'WI7'";
+            }else if($gId === 'WI8'){
+            $sql = "SELECT COUNT(id) FROM `$dbCol` WHERE draw_date > '$lastDrawP22B' AND draw_date < '$draw_date' AND game_id = 'WI8'";
+            }
+            $db->setQuery($sql);
+            $db->execute();
+            $rowP22count = $db->loadResult();
+            
+            $rowP22count = $rowP22count +1;
+            echo '<strong>'.$p22.':</strong> drawn '.date('m-d-Y',strtotime($lastDrawP22B)).' <strong>('.$rowP22count.' drawings ago)</strong><br />';   **/
+        
+        echo '</div>';
+        echo '</div>'; 
+        
+     } /** EO foreach **/
+        
+    } /** EO if !Empty **/ ?>
+</div> <?php /** EO LATESTDRAW DIV **/ ?>
+</div> <?php /** EO col span_2_of_2 DIV **/ ?>
+
+
+
+
+
+<?php /** ************************************* DRAWN NUMBERS FREQUENCIES ************************* **/ ?>
+
+
+<div class="col span_2_of_2">
+<div class="frequency-table-intro">
+    <div style="margin-bottom: 10px; font-size: 13px; line-height: 1.6; text-align: left; max-width: 600px; margin: 0 auto; background-color: #f4faff; padding: 15px; border-radius: 8px; box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);">
+        <p style="font-weight: bold; font-size: 16px; color: #0073e6; text-align: center; margin-top: 0;">How to Use Frequency Table</p>
+        <p style="margin: 10px 0;">This table shows how often each number was drawn in the last 100 drawings. Sort columns to find patterns:</p>
+        <ul style="list-style-type: none; padding-left: 0; margin: 10px 0;">
+            <li style="margin-bottom: 5px;"><strong>Number:</strong> Focus on specific numbers.</li>
+            <li style="margin-bottom: 5px;"><strong>Drawn Times:</strong> See most/least drawn numbers.</li>
+            <li style="margin-bottom: 5px;"><strong>Last Drawn:</strong> Find recent or overdue numbers.</li>
+            <li style="margin-bottom: 5px;"><strong>Fav:</strong> Mark your favorites.</li>
+        </ul>
+        <p style="margin-bottom: 0;">Expand the table to analyze more drawings for deeper insights.</p>
+    </div>
+</div>
+
+<div class="col span_2_of_2">
+<div class="freqDrawStats">
+<style type="text/css">
+h2.original-draw,h2.predicted-draw{background: #0269b1;color: #fff;padding: 10px;font-size: 20px;}
+table.sortable th:not(.sorttable_sorted):not(.sorttable_sorted_reverse):not(.sorttable_nosort):after {content: "\25B4\25BE"}
+#table10,#table11{max-width:100%;width: 100%;}
+#table10 thead,#table11 thead{background: #0d4973;color: #fff;}
+#table10 tbody tr,#table11 tbody tr {background: rgba(0,0,0,0);}
+#table10 tbody tr:hover,#table11 tbody tr:hover {background: #b0e8b7;}
+#table10 td,#table10 th,#table11 td,#table11 td {text-align: center;padding:5px;}
+input[type="checkbox"] {transform: scale(1.7) !important;}
+#fq-fav-container {display: block;padding: 10px;border: 3px solid #000;background:rgb(255, 210, 0);}
+#fq-fav-container span {display: inline-block;margin: 0px 5px;font-size: 20px;font-weight: 700;position: relative;background: radial-gradient(circle at 50% 20%,#95c9fd,#036 75%,#333 100%);color: #fff;border-radius: 50%;padding: 7px 7px 7px 7px !important;width: 40px;height: 40px;text-align: center;border: 1px solid #fff;}
+#fq-fav-container span:after{content: " ";display: block;position: absolute;width: 32px;height: 5px;bottom: -10%;left: 50%;transform: translate(-50%);border-radius: 50%;background: radial-gradient(ellipse at center,rgba(51,51,51,.75) 0,rgba(51,51,51,0) 75%);}
+#fq-fav-container strong {font-size: 20px;margin-right: 10px;}
+.roundedblue {position: relative;display: block;margin: 0px auto;background:radial-gradient(circle at 50% 20%,#2ea9ff,#0066ad 75%,#333 100%);color: #fff;border-radius: 50%;padding:3px 7px 5px 7px !important;width: 32px;height: 32px;}
+.roundedblue:after{content: " ";display: block;position: absolute;width: 32px;height: 5px;bottom: -10%;left: 50%;transform: translate(-50%);border-radius: 50%;background: radial-gradient(ellipse at center,rgba(51,51,51,.75) 0,rgba(51,51,51,0) 75%);}
+</style>
+<div class="main-fq-wrap">
+<div class="original-draw">
+<h2 class="original-draw">Frequencies Past 100 Drawings</h2>
+<div class="searchbar-wrapper">
+
+  <form name="fqsearch" method="POST" action="/all-us-lotteries/results-analysis?st=<?=$stateAbrev;?>&stn=<?=$stateName;?>&gm=<?=$gName;?>#table11">
+  <div class="lottery-fields-date">
+  <label>Drawings to analyse: </label> 
+  <select name="nod" id="nod">';
+    <?php
+    $nodss = range(10,700,5);
+    foreach($nodss as $nods){
+        echo '<option value="'.$nods.'">'.$nods.'</option>';
+    }
+    ?>
+  </select>
+  <input name="fq-search" type="submit" value="SEARCH" />
+  </div>
+  </form>
+</div> <?php /** EO SEARCH BAR WRAP **/?>
+
+<?php /** ***************Begin new sortable Table********************* **/ ?>
+    <table id="table10" class="sortable">
+    <thead>
+        <tr><th>Number</th><th>Drawn Times</th><th>Last Drawn</th><th>Fav</th></tr>
+    </thead>
+    <tbody>
+<?php /**  START THE TD LOOPS **/
+    $num_query = 1; /** Here we start with number 1 **/
+    $todaydate = date('Y-m-d');
+    
+    $db = JFactory::getDBO();
+    /** GAME FILTER **/
+    if($gId === 'WI7'){
+    $latestdraw = "SELECT MAX(draw_date) FROM `$dbCol` WHERE game_id = 'WI7'";
+    }else if($gId === 'WI8'){
+    $latestdraw = "SELECT MAX(draw_date) FROM `$dbCol` WHERE game_id = 'WI8'";
+    }
+    
+    while($num_query<=22){/** <------------------- CHANGE THE drawing AMOUNT HERE ***********  **/
+    	/** GET THE DRAWN TIMES WITHIN THE LAST 100 DRAWINGS **/
+        if($num_query < 10){
+            $num_query = str_pad($num_query, 2, "0", STR_PAD_LEFT);
+        }
+        
+        $db = JFactory::getDBO();
+        /** GAME FILTER **/
+        if($gId === 'WI7'){
+        $sql = "SELECT COUNT(`id`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI7' ORDER BY `draw_date` DESC LIMIT 100) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }else if($gId === 'WI8'){
+        $sql = "SELECT COUNT(`id`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI8' ORDER BY `draw_date` DESC LIMIT 100) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $count_num = $db->loadResult();
+        
+        if($count_num > 1){
+            $fcount = $count_num.' X';
+        }else if($count_num <= 1){
+            $fcount = $count_num.' X';
+        }
+        
+        /** GET THE LAST DRAWN DATE **/
+        $db = JFactory::getDBO();
+        /** GAME FILTER **/
+        if($gId === 'WI7'){
+        $sql = "SELECT MAX(`draw_date`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI7' ORDER BY `draw_date` DESC LIMIT 100) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }else if($gId === 'WI8'){
+        $sql = "SELECT MAX(`draw_date`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI8' ORDER BY `draw_date` DESC LIMIT 100) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $lastd = $db->loadResult();
+        
+        $db = JFactory::getDBO();
+        /** GAME FILTER **/
+        if($gId === 'WI7'){
+        $sql = "SELECT COUNT(`id`) FROM `$dbCol` WHERE (`draw_date` BETWEEN '$lastd' AND '$todaydate') AND game_id = 'WI7'";
+        }else if($gId === 'WI8'){
+        $sql = "SELECT COUNT(`id`) FROM `$dbCol` WHERE (`draw_date` BETWEEN '$lastd' AND '$todaydate') AND game_id = 'WI8'";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $lastdraw = $db->loadResult();
+        
+        if($lastdraw == 1){
+            $lastdrawing = 'In last drw';
+        }else if($lastdraw > 1 && $lastdraw <= 100){
+            $lastdrawing = $lastdraw.' drws ago';
+        }else if($lastdraw < 1 || $lastdraw > 100){
+            $lastdrawing = 'Not in last 100 drws';
+        }
+       
+        
+        echo '<tr><td class="roundedblue">'.$num_query.'</td><td sorttable_customkey="'.$count_num.'">'.$fcount.'</td><td sorttable_customkey="'.$lastdraw.'">'.$lastdrawing.'</td><td><input type="checkbox" id="input'.$num_query.'" name="favonum[]" value="'.$num_query.'"></td></tr>';
+        $num_query++;
+    }
+?>
+    </tbody>
+    </table>
+</div> <?php /** EO ORIGINAL DRAW **/?>
+
+<div class="predicted-draw">
+<?php if(isset($_POST['fq-search'])){ /** USER SPECIFYING DATE RANGE **/
+    $nod = $_POST['nod'];
+    if(!empty($_POST['fromdate'])){
+        $fromdate = $_POST['fromdate'];
+        $fromdate = date('Y-m-d',strtotime($fromdate));
+    }else{
+        $db = JFactory::getDBO();
+        $sql = "SELECT MIN(draw_date) FROM `$dbCol`";
+        $db->setQuery($sql);
+        $db->execute();
+        $fromdate = $db->loadResult();
+        $fromdate = date('Y-m-d',strtotime($fromdate));
+    }
+    if(!empty($_POST['todate'])){
+        $todate = $_POST['todate'];
+        $todate = date('Y-m-d',strtotime($todate));
+    }else{
+        $todate = date('Y-m-d');
+    }
+?>
+
+<style type="text/css">
+.original-draw{display:none}
+#table10 thead,#table11 thead{background: #0d4973;color: #fff;}
+#table11 td {text-align: center;}
+#table10 tbody tr,#table11 tbody tr {background: rgba(0,0,0,0);}
+#table10 tbody tr:hover,#table11 tbody tr:hover {background: #b0e8b7;}
+h2.predicted-draw{background: #0269b1;color: #fff;padding: 10px;font-size: 20px;}
+input[type="checkbox"] {transform: scale(1.7) !important;}
+#fq-fav-container {display: block;padding: 10px;border: 3px solid #000;background:rgb(255, 210, 0);}
+#fq-fav-container span {display: inline-block;margin: 0px 5px;font-size: 20px;font-weight: 700;position: relative;background: radial-gradient(circle at 50% 20%,#95c9fd,#036 75%,#333 100%);color: #fff;border-radius: 50%;padding: 7px 7px 7px 7px !important;width: 40px;height: 40px;text-align: center;border: 1px solid #fff;}
+#fq-fav-container span:after{content: " ";display: block;position: absolute;width: 32px;height: 5px;bottom: -10%;left: 50%;transform: translate(-50%);border-radius: 50%;background: radial-gradient(ellipse at center,rgba(51,51,51,.75) 0,rgba(51,51,51,0) 75%);}
+#fq-fav-container strong {font-size: 20px;margin-right: 10px;}
+.roundedblue {position: relative;display: block;margin: 0px auto;background:radial-gradient(circle at 50% 20%,#2ea9ff,#0066ad 75%,#333 100%);color: #fff;border-radius: 50%;padding:3px 7px 5px 7px !important;width: 32px;height: 32px;}
+.roundedblue:after{content: " ";display: block;position: absolute;width: 32px;height: 5px;bottom: -10%;left: 50%;transform: translate(-50%);border-radius: 50%;background: radial-gradient(ellipse at center,rgba(51,51,51,.75) 0,rgba(51,51,51,0) 75%);}
+</style>
+
+<h2 class="predicted-draw">Frequencies last <?php echo $nod.' drawings';?></h2>
+<div class="searchbar-wrapper">
+
+  <form name="fqsearch" method="POST" action="/all-us-lotteries/results-analysis?st=<?=$stateAbrev;?>&stn=<?=$stateName;?>&gm=<?=$gName;?>#table11">
+  <div class="lottery-fields-date">
+  <label>Number of drawings to analyse: </label> 
+  <select name="nod" id="nod">';
+    <?php
+    $nodss = range(5,200,5);
+    foreach($nodss as $nods){
+        echo '<option value="'.$nods.'">'.$nods.'</option>';
+    }
+    ?>
+  </select>
+  <input name="fq-search" type="submit" value="SEARCH" />
+  </div>
+  </form>
+</div> <?php /** EO SEARCH BAR WRAP **/?>
+
+<?php /** ***************Begin new predicted sortable Table********************* **/ ?>
+    <table id="table11" class="sortable">
+    <thead>
+        <tr><th>Number</th><th>Drawn Times</th><th>Last Drawn</th><th>Fav</th></tr>
+    </thead>
+    <tbody>
+<?php 
+    $number_query = 1; /** Here we start with number 1 **/
+    while($number_query<=22){/** <------------------- CHANGE THE drawing AMOUNT HERE ***********  **/
+    	/** GET THE DRAWN TIMES **/
+        if($number_query < 10){
+            $number_query = str_pad($number_query, 2, "0", STR_PAD_LEFT);
+        }
+        
+        $db = JFactory::getDBO();
+        /** GAME FILTER **/
+        if($gId === 'WI7'){
+        $sql = "SELECT COUNT(`id`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI7' ORDER BY `draw_date` DESC LIMIT $nod) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }else if($gId === 'WI8'){
+        $sql = "SELECT COUNT(`id`) FROM (SELECT * FROM `$dbCol` WHERE game_id = 'WI8' ORDER BY `draw_date` DESC LIMIT $nod) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $count_number = $db->loadResult();
+        
+        if($count_number > 1){
+            $fpcount = $count_number.' X';
+        }else if($count_number <= 1){
+            $fpcount = $count_number.' X';
+        }
+        
+        /** GET THE LAST DRAWN DATE **/
+        $db = JFactory::getDBO();
+        /** GAME FILTER **/
+        if($gId === 'WI7'){
+        $sql = "SELECT MAX(`draw_date`) FROM (SELECT * FROM `$dbCol` WHERE (`draw_date` BETWEEN '$fromdate' AND '$todate') AND game_id = 'WI7' ORDER BY `draw_date` DESC LIMIT $nod) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }else if($gId === 'WI8'){
+        $sql = "SELECT MAX(`draw_date`) FROM (SELECT * FROM `$dbCol` WHERE (`draw_date` BETWEEN '$fromdate' AND '$todate') AND game_id = 'WI8' ORDER BY `draw_date` DESC LIMIT $nod) AS T WHERE (first = '$num_query' OR second = '$num_query' OR third = '$num_query' OR fourth = '$num_query' OR fifth = '$num_query' OR sixth = '$num_query' OR seventh = '$num_query' OR eighth = '$num_query' OR nineth = '$num_query' OR tenth = '$num_query' OR eleventh = '$num_query' OR twelveth = '$num_query' OR thirtheenth = '$num_query' OR fourteenth = '$num_query' OR fifteenth = '$num_query' OR sixteenth = '$num_query' OR seventeenth = '$num_query' OR eighteenth = '$num_query' OR nineteenth = '$num_query' OR twentieth = '$num_query' OR twenty_first = '$num_query' OR twenty_second = '$num_query')";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $lastpd = $db->loadResult();
+        
+        $db = JFactory::getDBO();
+        if($gId === 'WI7'){
+        $sql = "SELECT COUNT(`id`) FROM `$dbCol` WHERE (`draw_date` BETWEEN '$lastpd' AND '$todate') AND game_id = 'WI7'";
+        }if($gId === 'WI8'){
+        $sql = "SELECT COUNT(`id`) FROM `$dbCol` WHERE (`draw_date` BETWEEN '$lastpd' AND '$todate') AND game_id = 'WI8'";
+        }
+        $db->setQuery($sql);
+        $db->execute();
+        $lastpdraw = $db->loadResult();
+        
+        
+        if($lastpdraw == 1){
+            $lastdprawing = 'In last drw';
+        }else if($lastpdraw > 1 && $lastpdraw <= $nod){
+            $lastdprawing = $lastpdraw.' drws ago';
+        }else if($lastpdraw < 1 || $lastpdraw > $nod){
+            $lastdprawing = 'Not in last '.$nod.' drws';
+        }
+        
+        echo '<tr><td class="roundedblue">'.$number_query.'</td><td sorttable_customkey="'.$count_number.'">'.$fpcount.'</td><td sorttable_customkey="'.$lastpdraw.'">'.$lastdprawing.'</td><td><input type="checkbox" id="input'.$number_query.'" name="favonum[]" value="'.$number_query.'"></td></tr>';
+        $number_query++;
+    }
+?>
+    </tbody>
+    </table>
+<?php } /** EO PREDICTED IF ISSET **/ ?>
+</div> <?php /** EO PREDICTED DRAW **/?>
+<div id="fq-fav-container"><strong>Favorites Selection: </strong></div>
+</div> <?php /** EO MAIN FQ WRAP **/?>
+
+<script type="text/javascript">
+jQuery(document).ready(function() {
+jQuery('input[name="favonum[]"]').change(function () {
+  var inputVal = jQuery(this).val() + ' ';
+  var className = inputVal.replace(/ /g, '_');
+
+  if (jQuery(this).prop('checked')) {  //which checkbox was checked
+    jQuery("#fq-fav-container").append('<span class="span_' + className + '">' + inputVal + '</span>');
+  } else {
+    jQuery('.span_'+className).remove();
+  }
+});
+ })
+</script>
+</div> <?php /** EO freqDrawStats DIV **/ ?>
+</div> <?php /** EO col span_1_of_2 DIV **/ ?>
+<div class="col span_1_of_2">
+&nbsp;
+</div> <?php /** EO col span_1_of_2 DIV **/ ?>
+</div> <?php /** EO SECTION GROUP DIV **/ ?>
+    <?php echo JHtml::_('content.prepare', '{loadposition Pick10Wheels}'); ?>
